@@ -5,6 +5,7 @@ import AlbumLayout from '@/Layouts/AlbumLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import Modal from '@/Components/Modal.vue';
 import TextInput from '@/Components/TextInput.vue';
 
 const props = defineProps({
@@ -26,9 +27,14 @@ const uploadForm = useForm({
 });
 
 const photoInput = ref(null);
+const showUploadModal = ref(false);
+const editForm = useForm({
+    title: props.album.title || '',
+    description: props.album.description || '',
+});
 
 const submitPhoto = () => {
-    uploadForm.post(route('albums.photos.store', props.album.id), {
+    uploadForm.post(route('albums.photos.store', props.album.token), {
         forceFormData: true,
         preserveScroll: true,
         onSuccess: () => {
@@ -36,6 +42,7 @@ const submitPhoto = () => {
             if (photoInput.value) {
                 photoInput.value.value = null;
             }
+            showUploadModal.value = false;
         },
     });
 };
@@ -43,131 +50,349 @@ const submitPhoto = () => {
 const handleFileChange = (event) => {
     uploadForm.photo = event.target.files[0];
 };
+
+const deleteForm = useForm({});
+
+const showConfirm = ref(false);
+const targetPhotoId = ref(null);
+const showPreview = ref(false);
+const previewPhoto = ref(null);
+const activeTab = ref('gallery');
+
+const confirmDelete = (photoId) => {
+    targetPhotoId.value = photoId;
+    showConfirm.value = true;
+};
+
+const deletePhoto = () => {
+    if (!targetPhotoId.value) return;
+    deleteForm.delete(route('albums.photos.destroy', { albumToken: props.album.token, photo: targetPhotoId.value }), {
+        preserveScroll: true,
+        onFinish: () => {
+            showConfirm.value = false;
+            targetPhotoId.value = null;
+        },
+    });
+};
+
+const openPreview = (photo) => {
+    previewPhoto.value = photo;
+    showPreview.value = true;
+};
+
+const closePreview = () => {
+    showPreview.value = false;
+    previewPhoto.value = null;
+};
+
+const openUploadModal = () => {
+    showUploadModal.value = true;
+};
+
+const closeUploadModal = () => {
+    showUploadModal.value = false;
+};
+
+const submitEdit = () => {
+    editForm.put(route('albums.update', { albumToken: props.album.token }), {
+        preserveScroll: true,
+    });
+};
 </script>
 
 <template>
     <Head :title="album.title" />
     <AlbumLayout>
-        <section
-            class="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/60 via-slate-900/80 to-slate-950 shadow-2xl shadow-blue-500/10"
-        >
-            <div
-                v-if="album.cover"
-                class="absolute inset-0 opacity-40"
-                :style="{ backgroundImage: `url(${album.cover})`, backgroundSize: 'cover', backgroundPosition: 'center' }"
-            />
-            <div class="relative grid gap-6 p-8 lg:grid-cols-[2fr,1fr] lg:gap-10">
-                <div class="space-y-4">
-                    <Link href="/" class="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white">
-                        ← Kembali ke album
-                    </Link>
-                    <h1 class="text-3xl font-bold text-white sm:text-4xl">{{ album.title }}</h1>
-                    <p class="text-white/80">
-                        {{ album.description || 'Kisah keluarga yang bisa kita simpan di sini.' }}
-                    </p>
-                    <div class="flex flex-wrap gap-3 text-sm text-white/80">
-                        <span class="rounded-full bg-white/10 px-4 py-2"> {{ album.photos?.length || 0 }} foto </span>
-                        <span v-if="album.owner" class="rounded-full bg-white/10 px-4 py-2"> Dibuat oleh {{ album.owner }} </span>
-                        <span class="rounded-full bg-white/10 px-4 py-2"> Upload membutuhkan login </span>
+        <section class="mb-6 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <Link
+                    :href="route('albums.index')"
+                    class="inline-flex items-center gap-2 rounded-full border border-white/25 bg-slate-950/80 px-3 py-2 text-sm font-medium text-white/90 shadow-lg shadow-blue-500/10 transition hover:-translate-y-0.5 hover:border-white/40 hover:text-white"
+                >
+                    Kembali Ke Daftar Album
+                </Link>
+                <div class="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.25em] text-white/70">
+                    <span class="rounded-full bg-white/10 px-3 py-1">{{ album.title }}</span>
+                    <span v-if="album.description" class="rounded-full bg-white/10 px-3 py-1">{{ album.description }}</span>
+                </div>
+            </div>
+            <div class="flex w-full flex-wrap items-center justify-end gap-1 text-[10px] text-white/75">
+                <span class="inline-flex items-center gap-1 rounded-full border border-white/20 bg-slate-950/80 px-2 py-0.5 shadow-md shadow-blue-500/10 backdrop-blur">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    {{ album.photos?.length || 0 }} Foto
+                </span>
+            </div>
+        </section>
+
+
+        <section class="mt-8">
+            <div class="mb-4 flex flex-wrap items-center justify-center gap-3">
+                <div class="flex gap-2 rounded-full border border-white/10 bg-white/5 p-1 text-sm text-white/80">
+                    <button
+                        type="button"
+                        class="rounded-full px-4 py-2 transition"
+                        :class="activeTab === 'gallery' ? 'bg-white/15 text-white shadow-lg shadow-blue-500/10' : 'text-white/70'"
+                        @click="activeTab = 'gallery'"
+                    >
+                        Gallery
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-full px-4 py-2 transition"
+                        :class="activeTab === 'edit' ? 'bg-white/15 text-white shadow-lg shadow-blue-500/10' : 'text-white/70'"
+                        @click="activeTab = 'edit'"
+                    >
+                        Ubah Detail Album
+                    </button>
+                </div>
+            </div>
+            <Transition name="fade-swap" mode="out-in">
+                <div v-if="activeTab === 'gallery'" key="gallery">
+                    <div v-if="album.photos?.length" class="columns-1 sm:columns-2 lg:columns-3 [column-gap:1.25rem] space-y-4 sm:space-y-6">
+                        <article
+                            v-for="photo in album.photos"
+                            :key="photo.id"
+                            class="group relative mb-4 break-inside-avoid overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70 shadow-2xl shadow-blue-500/10 backdrop-blur transition hover:-translate-y-1 hover:shadow-blue-500/20 sm:mb-6 cursor-pointer"
+                            @click="openPreview(photo)"
+                        >
+                            <div class="relative overflow-hidden">
+                                <img
+                                    :src="photo.url"
+                                    :alt="photo.title || 'Foto keluarga'"
+                                    class="w-full object-cover transition duration-700 group-hover:scale-105"
+                                />
+                                <div class="absolute inset-0 bg-gradient-to-b from-slate-950/30 via-slate-950/20 to-slate-950/80" />
+
+                                <div class="absolute left-3 right-3 top-3 flex items-center justify-between gap-2 text-[11px] text-white">
+                                    <div class="flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/75 px-3 py-1 shadow-lg shadow-black/30 backdrop-blur">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-400" />
+                                        <span class="uppercase tracking-wide text-white/90">{{ photo.taken_at || 'Tanpa tanggal' }}</span>
+                                    </div>
+                                    <button
+                                        v-if="canUpload"
+                                        type="button"
+                                        class="rounded-full border border-white/20 bg-gradient-to-r from-rose-500 to-red-500 px-3 py-1 text-[11px] font-semibold text-white shadow-lg shadow-rose-500/30 transition hover:-translate-y-0.5"
+                                        @click.stop="confirmDelete(photo.id)"
+                                    >
+                                        Hapus
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="p-3 text-white">
+                                <p class="text-sm font-semibold leading-snug line-clamp-1">{{ photo.title || 'Foto' }}</p>
+                                <p class="mt-1 text-xs text-white/70 line-clamp-2">
+                                    {{ photo.caption || 'Cerita singkat belum ditambahkan.' }}
+                                </p>
+                                <div class="mt-2 flex items-center justify-between text-xs text-white/70">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-400" />
+                                        <span>Oleh {{ photo.uploader || 'Pengguna' }}</span>
+                                    </div>
+                                    <span class="rounded-full bg-white/10 px-2.5 py-1 text-[11px] uppercase tracking-wide">
+                                        Album {{ album.title }}
+                                    </span>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                    <div v-else class="rounded-2xl border border-dashed border-white/15 bg-white/5 p-10 text-center text-white/70">
+                        Belum ada foto. {{ canUpload ? 'Unggah foto pertamamu!' : 'Login untuk menambahkan foto.' }}
                     </div>
                 </div>
 
-                <div v-if="canUpload" class="rounded-2xl border border-white/10 bg-white/10 p-5 backdrop-blur">
-                    <h3 class="mb-3 text-lg font-semibold text-white">Tambahkan foto</h3>
-                    <form @submit.prevent="submitPhoto" class="space-y-3">
+                <div v-else key="edit" class="rounded-2xl border border-white/10 bg-slate-950/70 p-5 shadow-2xl shadow-blue-500/10 backdrop-blur">
+                    <h3 class="text-lg font-semibold text-white">Ubah album</h3>
+                    <p class="text-sm text-white/65">Perbarui judul dan deskripsi, lalu simpan.</p>
+                    <form @submit.prevent="submitEdit" class="mt-4 space-y-3">
                         <div>
-                            <InputLabel for="title" value="Judul (opsional)" />
+                            <InputLabel for="edit-title-tab" value="Judul" />
                             <TextInput
-                                id="title"
-                                v-model="uploadForm.title"
+                                id="edit-title-tab"
+                                v-model="editForm.title"
                                 type="text"
                                 class="mt-2 block w-full"
-                                placeholder="Makan malam keluarga"
+                                required
                             />
-                            <InputError :message="uploadForm.errors.title" class="mt-2" />
+                            <InputError :message="editForm.errors.title" class="mt-1" />
                         </div>
                         <div>
-                            <InputLabel for="caption" value="Cerita singkat" />
+                            <InputLabel for="edit-description-tab" value="Deskripsi" />
                             <textarea
-                                id="caption"
-                                v-model="uploadForm.caption"
-                                rows="2"
-                                class="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-white focus:border-cyan-400 focus:ring-0"
-                                placeholder="Tuliskan momen istimewa..."
+                                id="edit-description-tab"
+                                v-model="editForm.description"
+                                rows="3"
+                                class="mt-2 w-full rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-cyan-400 focus:ring-0"
                             />
-                            <InputError :message="uploadForm.errors.caption" class="mt-2" />
+                            <InputError :message="editForm.errors.description" class="mt-1" />
                         </div>
+                        <PrimaryButton :disabled="editForm.processing">
+                            Simpan perubahan
+                        </PrimaryButton>
+                    </form>
+                </div>
+            </Transition>
+        </section>
+
+        <button
+            v-if="canUpload"
+            type="button"
+            class="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-2xl font-bold text-white shadow-2xl shadow-cyan-500/30 transition hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+            @click="openUploadModal"
+            aria-label="Tambah foto"
+        >
+            +
+        </button>
+
+        <Modal :show="showUploadModal" maxWidth="lg" @close="closeUploadModal">
+            <div class="bg-slate-950 text-white">
+                <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <div>
+                        <h3 class="text-lg font-semibold">Tambah foto</h3>
+                        <p class="text-sm text-white/70">Unggah foto baru ke album ini.</p>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 hover:border-white/40 hover:text-white"
+                        @click="closeUploadModal"
+                    >
+                        Tutup
+                    </button>
+                </div>
+                <div class="px-4 py-5">
+                    <form @submit.prevent="submitPhoto" class="space-y-4">
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <InputLabel for="taken_at" value="Tanggal" />
+                                <InputLabel for="title-modal" value="Judul (opsional)" />
                                 <TextInput
-                                    id="taken_at"
+                                    id="title-modal"
+                                    v-model="uploadForm.title"
+                                    type="text"
+                                    class="mt-2 block w-full"
+                                    placeholder="Makan malam keluarga"
+                                />
+                                <InputError :message="uploadForm.errors.title" class="mt-2" />
+                            </div>
+                            <div>
+                                <InputLabel for="taken_at_modal" value="Tanggal" />
+                                <TextInput
+                                    id="taken_at_modal"
                                     v-model="uploadForm.taken_at"
                                     type="date"
                                     class="mt-2 block w-full"
                                 />
                                 <InputError :message="uploadForm.errors.taken_at" class="mt-2" />
                             </div>
-                            <div>
-                                <InputLabel for="photo" value="File foto" />
-                                <input
-                                    id="photo"
-                                    ref="photoInput"
-                                    type="file"
-                                    accept="image/*"
-                                    class="mt-2 block w-full text-sm text-white file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-cyan-600"
-                                    @change="handleFileChange"
-                                />
-                                <InputError :message="uploadForm.errors.photo" class="mt-2" />
-                            </div>
                         </div>
-                        <PrimaryButton :disabled="uploadForm.processing">
+                        <div>
+                            <InputLabel for="caption-modal" value="Cerita singkat" />
+                            <textarea
+                                id="caption-modal"
+                                v-model="uploadForm.caption"
+                                rows="3"
+                                class="mt-2 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-white focus:border-cyan-400 focus:ring-0"
+                                placeholder="Tuliskan momen istimewa..."
+                            />
+                            <InputError :message="uploadForm.errors.caption" class="mt-2" />
+                        </div>
+                        <div class="flex flex-col gap-2 rounded-2xl border border-dashed border-white/20 bg-slate-900/60 p-4 text-sm text-white/80">
+                            <div class="flex items-center justify-between">
+                                <InputLabel for="photo-modal" value="File foto" />
+                                <span class="rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-white/70">max 5MB</span>
+                            </div>
+                            <input
+                                id="photo-modal"
+                                ref="photoInput"
+                                type="file"
+                                accept="image/*"
+                                class="w-full text-sm text-white file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-cyan-600"
+                                @change="handleFileChange"
+                            />
+                            <InputError :message="uploadForm.errors.photo" class="mt-1" />
+                        </div>
+                        <PrimaryButton :disabled="uploadForm.processing" class="w-full justify-center">
                             Upload Foto
                         </PrimaryButton>
                     </form>
                 </div>
             </div>
-        </section>
+        </Modal>
 
-        <section class="mt-8">
-            <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-white">Isi album</h2>
-                <p class="text-sm text-white/60">Ditampilkan terbaru dahulu</p>
-            </div>
-            <div v-if="album.photos?.length" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                <article
-                    v-for="photo in album.photos"
-                    :key="photo.id"
-                    class="group overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg shadow-blue-500/10"
-                >
-                    <div class="relative h-52 overflow-hidden">
-                        <img
-                            :src="photo.url"
-                            :alt="photo.title || 'Foto keluarga'"
-                            class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
-                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
-                        <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white drop-shadow">
-                            <div>
-                                <p class="text-lg font-semibold">{{ photo.title || 'Foto' }}</p>
-                                <p class="text-xs text-white/80">
-                                    {{ photo.caption || 'Cerita singkat belum ditambahkan.' }}
-                                </p>
-                            </div>
-                            <div class="rounded-full bg-white/15 px-3 py-1 text-[11px] uppercase tracking-wide">
-                                {{ photo.taken_at || 'Tanpa tanggal' }}
-                            </div>
-                        </div>
+        <Modal :show="showPreview" maxWidth="2xl" @close="closePreview">
+            <div class="bg-slate-950 text-white">
+                <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                    <div>
+                        <p class="text-sm font-semibold">{{ previewPhoto?.title || 'Foto' }}</p>
+                        <p class="text-[11px] text-white/70">{{ previewPhoto?.taken_at || 'Tanpa tanggal' }}</p>
                     </div>
-                    <div class="flex items-center justify-between px-4 py-3 text-xs text-white/60">
-                        <span>Diunggah oleh {{ photo.uploader || 'Pengguna' }}</span>
-                        <span class="rounded-full bg-white/10 px-3 py-1">Album {{ album.title }}</span>
+                    <button
+                        type="button"
+                        class="rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 hover:border-white/40 hover:text-white"
+                        @click="closePreview"
+                    >
+                        Tutup
+                    </button>
+                </div>
+                <div class="max-h-[70vh] overflow-auto bg-slate-900">
+                    <img
+                        v-if="previewPhoto?.url"
+                        :src="previewPhoto.url"
+                        :alt="previewPhoto?.title || 'Foto'"
+                        class="mx-auto max-h-[70vh] w-full object-contain"
+                    />
+                </div>
+                <div class="space-y-1 border-t border-white/10 px-4 py-3 text-xs text-white/75">
+                    <p class="line-clamp-2">{{ previewPhoto?.caption || 'Cerita singkat belum ditambahkan.' }}</p>
+                    <p class="text-white/60">Oleh {{ previewPhoto?.uploader || 'Pengguna' }}</p>
+                </div>
+            </div>
+        </Modal>
+
+        <Modal :show="showConfirm" maxWidth="md" @close="showConfirm = false">
+            <div class="bg-slate-950 text-white">
+                <div class="flex items-start gap-3 border-b border-white/10 px-6 py-4">
+                    <div class="mt-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-200">
+                        !
                     </div>
-                </article>
+                    <div>
+                        <h3 class="text-lg font-semibold">Hapus foto?</h3>
+                        <p class="text-sm text-white/70">Foto akan dihapus permanen dari album ini.</p>
+                    </div>
+                </div>
+                <div class="px-6 py-5 text-sm text-white/80">
+                    Tindakan ini tidak bisa dibatalkan. Pastikan foto sudah disalin bila perlu.
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-white/10 bg-slate-900/80 px-6 py-4">
+                    <button
+                        type="button"
+                        class="rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 transition hover:-translate-y-0.5 hover:border-white/40 hover:text-white"
+                        @click="showConfirm = false"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:-translate-y-0.5"
+                        @click="deletePhoto"
+                        :disabled="deleteForm.processing"
+                    >
+                        Hapus
+                    </button>
+                </div>
             </div>
-            <div v-else class="rounded-2xl border border-dashed border-white/15 bg-white/5 p-10 text-center text-white/70">
-                Belum ada foto. {{ canUpload ? 'Unggah foto pertamamu!' : 'Login untuk menambahkan foto.' }}
-            </div>
-        </section>
+        </Modal>
     </AlbumLayout>
 </template>
+
+<style scoped>
+.fade-swap-enter-active,
+.fade-swap-leave-active {
+    transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.fade-swap-enter-from,
+.fade-swap-leave-to {
+    opacity: 0;
+    transform: translateY(6px);
+}
+</style>

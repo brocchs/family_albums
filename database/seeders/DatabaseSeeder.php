@@ -16,12 +16,20 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        // Default login user for local development
+        // Default login users for local development
         User::updateOrCreate(
             ['email' => 'moch.alfarisyi@gmail.com'],
             [
-                'name' => 'Admin',
+                'name' => 'Alfarisyi',
                 'password' => Hash::make('Broki123'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'ecin@test.com'],
+            [
+                'name' => 'Ecin',
+                'password' => Hash::make('ecin123'),
             ]
         );
     }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\AlbumController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,12 +16,15 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/', [AlbumController::class, 'index'])->name('albums.index');
-Route::get('/albums/{album}', [AlbumController::class, 'show'])->name('albums.show');
+Route::get('/', fn () => redirect()->route('login'))->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
+    Route::get('/albums/{albumToken}', [AlbumController::class, 'show'])->name('albums.show');
     Route::post('/albums', [AlbumController::class, 'store'])->name('albums.store');
-    Route::post('/albums/{album}/photos', [AlbumController::class, 'storePhoto'])->name('albums.photos.store');
+    Route::put('/albums/{albumToken}', [AlbumController::class, 'update'])->name('albums.update');
+    Route::post('/albums/{albumToken}/photos', [AlbumController::class, 'storePhoto'])->name('albums.photos.store');
+    Route::delete('/albums/{albumToken}/photos/{photo}', [AlbumController::class, 'destroyPhoto'])->name('albums.photos.destroy');
 });
 
 Route::get('/dashboard', fn () => redirect()->route('albums.index'))

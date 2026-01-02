@@ -20,8 +20,8 @@ const flash = computed(() => page.props.flash || {});
                 <Link href="/" class="flex items-center gap-2 text-lg font-semibold tracking-tight">
                     <span class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 text-sm font-bold text-white shadow-lg">FA</span>
                     <div class="leading-tight">
-                        <p class="text-sm uppercase text-white/60">Family Album</p>
-                        <p class="text-base text-white">Kenangan Cantik</p>
+                        <p class="text-sm uppercase text-white/60">Faris Family Album</p>
+                        <p class="text-base text-white">Dokumentasikan Kenanganmu</p>
                     </div>
                 </Link>
 
