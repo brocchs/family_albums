@@ -1,18 +1,23 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import AlbumLayout from '@/Layouts/AlbumLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import Modal from '@/Components/Modal.vue';
+import LazyImage from '@/Components/LazyImage.vue';
 import { useLoading } from '@/composables/useLoading';
 
 const props = defineProps({
     albums: {
         type: Array,
         required: true,
+    },
+    hasMore: {
+        type: Boolean,
+        default: false,
     },
     canManage: {
         type: Boolean,
@@ -28,10 +33,51 @@ const albumForm = useForm({
 const deleteForm = useForm({});
 const showDeleteModal = ref(false);
 const albumToDelete = ref(null);
+const displayedAlbums = ref([...props.albums]);
+const currentPage = ref(1);
+const isLoadingMore = ref(false);
 
 const { startLoading, stopLoading } = useLoading();
 
 const accentClass = computed(() => 'from-cyan-400 via-blue-500 to-indigo-500');
+
+const loadMore = async () => {
+    if (isLoadingMore.value || !props.hasMore) return;
+    
+    isLoadingMore.value = true;
+    currentPage.value++;
+    
+    try {
+        const response = await fetch(`/albums?page=${currentPage.value}`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        displayedAlbums.value.push(...data.albums);
+        props.hasMore = data.hasMore;
+    } catch (error) {
+        console.error('Error loading more albums:', error);
+    } finally {
+        isLoadingMore.value = false;
+    }
+};
+
+const handleScroll = () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
+        loadMore();
+    }
+};
+
+onMounted(() => {
+    window.addEventListener('scroll', handleScroll);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('scroll', handleScroll);
+});
 
 const createAlbum = () => {
     startLoading('Membuat album...');
@@ -74,13 +120,13 @@ const deleteAlbum = () => {
                         <h1 class="text-4xl font-bold text-white sm:text-5xl">Semua album saya.</h1>
                     </div>
                     <div class="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/80">
-                        {{ albums.length }} album
+                        {{ displayedAlbums.length }} album
                     </div>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-3">
                     <div class="rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-cyan-500/10">
                         <p class="text-xs text-white/60">Foto total</p>
-                        <p class="text-2xl font-semibold text-white">{{ albums.reduce((t, a) => t + (a.photos_count || 0), 0) }}</p>
+                        <p class="text-2xl font-semibold text-white">{{ displayedAlbums.reduce((t, a) => t + (a.photos_count || 0), 0) }}</p>
                         <p class="text-sm text-white/60">Gabungan semua album.</p>
                     </div>
                     <div class="rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-blue-500/10">
@@ -97,16 +143,21 @@ const deleteAlbum = () => {
 
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Link
-                        v-for="album in albums"
+                        v-for="album in displayedAlbums"
                         :key="album.id"
                         :href="route('albums.show', album.token)"
                         class="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-xl shadow-blue-500/10 transition hover:-translate-y-1 hover:shadow-2xl"
                     >
-                        <div
-                            class="relative h-44 overflow-hidden"
-                            :class="[`bg-gradient-to-br ${accentClass}`]"
-                            :style="album.cover ? { backgroundImage: `url(${album.cover})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}"
-                        >
+                        <div class="relative h-44 overflow-hidden bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-500">
+                            <LazyImage
+                                v-if="album.cover"
+                                :src="album.cover"
+                                alt="Cover album"
+                                loading-text="Memuat cover..."
+                                error-text="Gagal memuat cover"
+                                image-class="absolute inset-0 w-full h-full object-cover"
+                                container-class="absolute inset-0"
+                            />
                             <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent" />
                             <div class="absolute left-0 top-0 flex flex-wrap gap-2 p-3">
                                 <span class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-slate-950/80 px-3 py-1 text-[11px] uppercase tracking-wide text-white shadow-lg shadow-black/25 backdrop-blur">
@@ -127,12 +178,17 @@ const deleteAlbum = () => {
                                     <p class="text-[11px] text-white/70 line-clamp-1">{{ album.description || 'Belum ada deskripsi.' }}</p>
                                 </div>
                                 <div class="flex -space-x-2">
-                                    <img
+                                    <LazyImage
                                         v-for="photo in album.photos"
                                         :key="photo.id"
                                         :src="photo.url"
                                         alt=""
-                                        class="h-9 w-9 rounded-lg border border-white/20 object-cover shadow"
+                                        loading-text=""
+                                        error-text=""
+                                        image-class="h-full w-full object-cover"
+                                        container-class="relative h-9 w-9 rounded-lg border border-white/20 overflow-hidden bg-slate-700"
+                                        skeleton-class="bg-slate-600 animate-pulse"
+                                        error-class="bg-slate-700 flex items-center justify-center"
                                     />
                                 </div>
                             </div>
@@ -153,10 +209,17 @@ const deleteAlbum = () => {
                     </Link>
 
                     <div
-                        v-if="!albums.length"
+                        v-if="!displayedAlbums.length"
                         class="rounded-2xl border border-dashed border-white/20 bg-white/5 p-10 text-center text-white/70"
                     >
                         Belum ada album. {{ canManage ? 'Buat satu untuk mulai menyimpan kenangan.' : 'Login untuk mulai menambah album.' }}
+                    </div>
+                    
+                    <div v-if="isLoadingMore" class="col-span-full flex justify-center py-8">
+                        <div class="flex items-center gap-3 text-white/70">
+                            <div class="w-6 h-6 border-2 border-gray-300 border-t-cyan-400 rounded-full animate-spin"></div>
+                            <span>Memuat album lainnya...</span>
+                        </div>
                     </div>
                 </div>
             </div>

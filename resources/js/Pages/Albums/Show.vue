@@ -1,12 +1,13 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import AlbumLayout from '@/Layouts/AlbumLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Modal from '@/Components/Modal.vue';
 import TextInput from '@/Components/TextInput.vue';
+import LazyImage from '@/Components/LazyImage.vue';
 import { useLoading } from '@/composables/useLoading';
 
 const props = defineProps({
@@ -166,12 +167,14 @@ const submitEdit = () => {
                             class="group relative mb-4 break-inside-avoid overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70 shadow-2xl shadow-blue-500/10 backdrop-blur transition hover:-translate-y-1 hover:shadow-blue-500/20 sm:mb-6 cursor-pointer"
                             @click="openPreview(photo)"
                         >
-                            <div class="relative overflow-hidden">
-                                <img
-                                    :src="photo.url"
-                                    :alt="photo.title || 'Foto keluarga'"
-                                    class="w-full object-cover transition duration-700 group-hover:scale-105"
-                                />
+                            <LazyImage
+                                :src="photo.url"
+                                :alt="photo.title || 'Foto keluarga'"
+                                loading-text="Memuat foto..."
+                                error-text="Gagal memuat foto"
+                                image-class="w-full object-cover transition duration-700 group-hover:scale-105"
+                                container-class="relative overflow-hidden"
+                            >
                                 <div class="absolute inset-0 bg-gradient-to-b from-slate-950/30 via-slate-950/20 to-slate-950/80" />
 
                                 <div class="absolute left-3 right-3 top-3 flex items-center justify-between gap-2 text-[11px] text-white">
@@ -188,7 +191,7 @@ const submitEdit = () => {
                                         Hapus
                                     </button>
                                 </div>
-                            </div>
+                            </LazyImage>
 
                             <div class="p-3 text-white">
                                 <p class="text-sm font-semibold leading-snug line-clamp-1">{{ photo.title || 'Foto' }}</p>
@@ -346,11 +349,15 @@ const submitEdit = () => {
                     </button>
                 </div>
                 <div class="max-h-[70vh] overflow-auto bg-slate-900">
-                    <img
+                    <LazyImage
                         v-if="previewPhoto?.url"
                         :src="previewPhoto.url"
                         :alt="previewPhoto?.title || 'Foto'"
-                        class="mx-auto max-h-[70vh] w-full object-contain"
+                        loading-text="Memuat preview..."
+                        error-text="Gagal memuat preview"
+                        image-class="mx-auto max-h-[70vh] w-full object-contain"
+                        container-class="relative"
+                        :lazy="false"
                     />
                 </div>
                 <div class="space-y-1 border-t border-white/10 px-4 py-3 text-xs text-white/75">

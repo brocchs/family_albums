@@ -36,32 +36,46 @@ class AlbumController extends Controller
         return $query->firstOrFail();
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $perPage = 6;
+        $page = $request->get('page', 1);
+        
         $albums = Album::with(['photos' => fn ($query) => $query->latest()->take(6), 'user'])
             ->withCount('photos')
             ->latest()
-            ->get();
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $albumsData = $albums->map(function (Album $album) {
+            $cover = $album->cover_path ?: optional($album->photos->first())->path;
+
+            return [
+                'id' => $album->id,
+                'title' => $album->title,
+                'description' => $album->description,
+                'owner' => $album->user?->name,
+                'cover' => $cover ? Storage::url($cover) : null,
+                'token' => $this->encodeId($album->id),
+                'photos' => $album->photos->map(fn (Photo $photo) => [
+                    'id' => $photo->id,
+                    'title' => $photo->title,
+                    'url' => Storage::url($photo->path),
+                ]),
+                'photos_count' => $album->photos_count,
+            ];
+        });
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'albums' => $albumsData,
+                'hasMore' => $albums->hasMorePages(),
+                'nextPage' => $albums->currentPage() + 1,
+            ]);
+        }
 
         return Inertia::render('Albums/Index', [
-            'albums' => $albums->map(function (Album $album) {
-                $cover = $album->cover_path ?: optional($album->photos->first())->path;
-
-                return [
-                    'id' => $album->id,
-                    'title' => $album->title,
-                    'description' => $album->description,
-                    'owner' => $album->user?->name,
-                    'cover' => $cover ? Storage::url($cover) : null,
-                    'token' => $this->encodeId($album->id),
-                    'photos' => $album->photos->map(fn (Photo $photo) => [
-                        'id' => $photo->id,
-                        'title' => $photo->title,
-                        'url' => Storage::url($photo->path),
-                    ]),
-                    'photos_count' => $album->photos_count,
-                ];
-            }),
+            'albums' => $albumsData,
+            'hasMore' => $albums->hasMorePages(),
             'canManage' => Auth::check(),
         ]);
     }
