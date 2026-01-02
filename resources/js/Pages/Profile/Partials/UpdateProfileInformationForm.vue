@@ -4,6 +4,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { useLoading } from '@/composables/useLoading';
 
 const props = defineProps({
     mustVerifyEmail: Boolean,
@@ -11,11 +12,19 @@ const props = defineProps({
 });
 
 const user = usePage().props.auth.user;
+const { startLoading, stopLoading } = useLoading();
 
 const form = useForm({
     name: user.name,
     email: user.email,
 });
+
+const submit = () => {
+    startLoading('Menyimpan profil...');
+    form.patch(route('profile.update'), {
+        onFinish: () => stopLoading(),
+    });
+};
 </script>
 
 <template>
@@ -28,7 +37,7 @@ const form = useForm({
             </p>
         </header>
 
-        <form @submit.prevent="form.patch(route('profile.update'))" class="mt-6 space-y-6">
+        <form @submit.prevent="submit" class="mt-6 space-y-6">
             <div>
                 <InputLabel for="name" value="Name" />
 

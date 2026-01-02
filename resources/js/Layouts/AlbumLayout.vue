@@ -1,8 +1,11 @@
 <script setup>
 import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
+import Loading from '@/Components/Loading.vue';
+import { useLoading } from '@/composables/useLoading';
 
 const page = usePage();
+const { isLoading, loadingMessage } = useLoading();
 
 const auth = computed(() => page.props.auth);
 const flash = computed(() => page.props.flash || {});
@@ -58,5 +61,8 @@ const flash = computed(() => page.props.flash || {});
         <main class="relative mx-auto max-w-6xl px-6 pb-16 pt-10">
             <slot />
         </main>
+        
+        <!-- Global Loading Component -->
+        <Loading :show="isLoading" :message="loadingMessage" />
     </div>
 </template>

@@ -5,9 +5,12 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import Loading from '@/Components/Loading.vue';
 import { Link } from '@inertiajs/vue3';
+import { useLoading } from '@/composables/useLoading';
 
 const showingNavigationDropdown = ref(false);
+const { isLoading, loadingMessage } = useLoading();
 </script>
 
 <template>
@@ -148,5 +151,8 @@ const showingNavigationDropdown = ref(false);
                 <slot />
             </main>
         </div>
+        
+        <!-- Global Loading Component -->
+        <Loading :show="isLoading" :message="loadingMessage" />
     </div>
 </template>

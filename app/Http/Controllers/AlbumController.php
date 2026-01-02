@@ -139,26 +139,53 @@ class AlbumController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'caption' => ['nullable', 'string', 'max:1000'],
             'taken_at' => ['nullable', 'date'],
-            'photo' => ['required', 'image', 'max:5120'],
+            'photos' => ['required', 'array'],
+            'photos.*' => ['required', 'image', 'max:5120'],
         ]);
 
-        $path = $request->file('photo')->store("albums/{$album->id}", 'public');
+        $uploadedPhotos = [];
+        
+        foreach ($request->file('photos') as $file) {
+            $path = $file->store("albums/{$album->id}", 'public');
 
-        $photo = $album->photos()->create([
-            'user_id' => $request->user()->id,
-            'title' => $data['title'] ?? null,
-            'caption' => $data['caption'] ?? null,
-            'taken_at' => $data['taken_at'] ?? null,
-            'path' => $path,
-        ]);
-
-        if (! $album->cover_path) {
-            $album->update(['cover_path' => $photo->path]);
+            $photo = $album->photos()->create([
+                'user_id' => $request->user()->id,
+                'title' => $data['title'] ?? null,
+                'caption' => $data['caption'] ?? null,
+                'taken_at' => $data['taken_at'] ?? null,
+                'path' => $path,
+            ]);
+            
+            $uploadedPhotos[] = $photo;
         }
+
+        if (! $album->cover_path && !empty($uploadedPhotos)) {
+            $album->update(['cover_path' => $uploadedPhotos[0]->path]);
+        }
+
+        $count = count($uploadedPhotos);
+        $message = $count === 1 ? 'Foto berhasil diunggah ke album.' : "{$count} foto berhasil diunggah ke album.";
 
         return redirect()
             ->back()
-            ->with('success', 'Foto berhasil diunggah ke album.');
+            ->with('success', $message);
+    }
+
+    public function destroy(string $albumToken)
+    {
+        $album = $this->findAlbumByToken($albumToken, true);
+
+        // Delete all photos from storage
+        foreach ($album->photos as $photo) {
+            Storage::disk('public')->delete($photo->path);
+        }
+
+        // Delete album and all related photos
+        $album->delete();
+
+        return redirect()
+            ->route('albums.index')
+            ->with('success', 'Album dan semua foto di dalamnya berhasil dihapus.');
     }
 
     public function destroyPhoto(Request $request, string $albumToken, Photo $photo)

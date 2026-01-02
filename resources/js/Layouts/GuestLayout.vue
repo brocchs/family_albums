@@ -1,6 +1,10 @@
 <script setup>
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
+import Loading from '@/Components/Loading.vue';
 import { Link } from '@inertiajs/vue3';
+import { useLoading } from '@/composables/useLoading';
+
+const { isLoading, loadingMessage } = useLoading();
 </script>
 
 <template>
@@ -26,5 +30,8 @@ import { Link } from '@inertiajs/vue3';
                 <slot />
             </div>
         </div>
+        
+        <!-- Global Loading Component -->
+        <Loading :show="isLoading" :message="loadingMessage" />
     </div>
 </template>

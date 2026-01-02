@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/albums/{albumToken}', [AlbumController::class, 'show'])->name('albums.show');
     Route::post('/albums', [AlbumController::class, 'store'])->name('albums.store');
     Route::put('/albums/{albumToken}', [AlbumController::class, 'update'])->name('albums.update');
+    Route::delete('/albums/{albumToken}', [AlbumController::class, 'destroy'])->name('albums.destroy');
     Route::post('/albums/{albumToken}/photos', [AlbumController::class, 'storePhoto'])->name('albums.photos.store');
     Route::delete('/albums/{albumToken}/photos/{photo}', [AlbumController::class, 'destroyPhoto'])->name('albums.photos.destroy');
 });

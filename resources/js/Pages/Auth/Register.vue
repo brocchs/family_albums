@@ -5,6 +5,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { useLoading } from '@/composables/useLoading';
 
 const form = useForm({
     name: '',
@@ -14,9 +15,15 @@ const form = useForm({
     terms: false,
 });
 
+const { startLoading, stopLoading } = useLoading();
+
 const submit = () => {
+    startLoading('Mendaftar akun...');
     form.post(route('register'), {
-        onFinish: () => form.reset('password', 'password_confirmation'),
+        onFinish: () => {
+            form.reset('password', 'password_confirmation');
+            stopLoading();
+        },
     });
 };
 </script>

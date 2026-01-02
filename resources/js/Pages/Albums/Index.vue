@@ -1,11 +1,13 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import AlbumLayout from '@/Layouts/AlbumLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import Modal from '@/Components/Modal.vue';
+import { useLoading } from '@/composables/useLoading';
 
 const props = defineProps({
     albums: {
@@ -23,12 +25,40 @@ const albumForm = useForm({
     description: '',
 });
 
+const deleteForm = useForm({});
+const showDeleteModal = ref(false);
+const albumToDelete = ref(null);
+
+const { startLoading, stopLoading } = useLoading();
+
 const accentClass = computed(() => 'from-cyan-400 via-blue-500 to-indigo-500');
 
 const createAlbum = () => {
+    startLoading('Membuat album...');
     albumForm.post(route('albums.store'), {
         preserveScroll: true,
-        onSuccess: () => albumForm.reset(),
+        onSuccess: () => {
+            albumForm.reset();
+            stopLoading();
+        },
+        onError: () => stopLoading(),
+    });
+};
+
+const confirmDeleteAlbum = (album) => {
+    albumToDelete.value = album;
+    showDeleteModal.value = true;
+};
+
+const deleteAlbum = () => {
+    if (!albumToDelete.value) return;
+    startLoading('Menghapus album...');
+    deleteForm.delete(route('albums.destroy', albumToDelete.value.token), {
+        onFinish: () => {
+            showDeleteModal.value = false;
+            albumToDelete.value = null;
+            stopLoading();
+        },
     });
 };
 </script>
@@ -111,9 +141,14 @@ const createAlbum = () => {
                             <span class="flex items-center gap-2">
                                 <span class="h-2 w-2 rounded-full bg-emerald-400" /> Buka album
                             </span>
-                            <span class="rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wide transition group-hover:bg-white/20">
-                                Detail
-                            </span>
+                            <button
+                                v-if="canManage"
+                                type="button"
+                                class="rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-3 py-1 text-[11px] font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:-translate-y-0.5"
+                                @click.prevent="confirmDeleteAlbum(album)"
+                            >
+                                Hapus
+                            </button>
                         </div>
                     </Link>
 
@@ -159,5 +194,44 @@ const createAlbum = () => {
                 </form>
             </div>
         </section>
+        
+        <Modal :show="showDeleteModal" maxWidth="md" @close="showDeleteModal = false">
+            <div class="bg-slate-950 text-white">
+                <div class="flex items-start gap-3 border-b border-white/10 px-6 py-4">
+                    <div class="mt-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-200">
+                        !
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold">Hapus Album?</h3>
+                        <p class="text-sm text-white/70">Album "{{ albumToDelete?.title }}" akan dihapus permanen.</p>
+                    </div>
+                </div>
+                <div class="px-6 py-5 text-sm text-white/80">
+                    <p class="mb-3">Tindakan ini akan menghapus:</p>
+                    <ul class="list-disc list-inside space-y-1 text-white/70">
+                        <li>Album dan semua informasinya</li>
+                        <li>Semua foto di dalam album ({{ albumToDelete?.photos_count || 0 }} foto)</li>
+                        <li>Semua data tidak dapat dikembalikan</li>
+                    </ul>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-white/10 bg-slate-900/80 px-6 py-4">
+                    <button
+                        type="button"
+                        class="rounded-full border border-white/20 px-4 py-2 text-sm text-white/80 transition hover:-translate-y-0.5 hover:border-white/40 hover:text-white"
+                        @click="showDeleteModal = false"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-rose-500/20 transition hover:-translate-y-0.5"
+                        @click="deleteAlbum"
+                        :disabled="deleteForm.processing"
+                    >
+                        Hapus Album
+                    </button>
+                </div>
+            </div>
+        </Modal>
     </AlbumLayout>
 </template>

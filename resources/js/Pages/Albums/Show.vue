@@ -7,6 +7,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import Modal from '@/Components/Modal.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useLoading } from '@/composables/useLoading';
 
 const props = defineProps({
     album: {
@@ -23,8 +24,10 @@ const uploadForm = useForm({
     title: '',
     caption: '',
     taken_at: '',
-    photo: null,
+    photos: [],
 });
+
+const { startLoading, stopLoading } = useLoading();
 
 const photoInput = ref(null);
 const showUploadModal = ref(false);
@@ -34,6 +37,7 @@ const editForm = useForm({
 });
 
 const submitPhoto = () => {
+    startLoading('Mengupload foto...');
     uploadForm.post(route('albums.photos.store', props.album.token), {
         forceFormData: true,
         preserveScroll: true,
@@ -43,12 +47,14 @@ const submitPhoto = () => {
                 photoInput.value.value = null;
             }
             showUploadModal.value = false;
+            stopLoading();
         },
+        onError: () => stopLoading(),
     });
 };
 
 const handleFileChange = (event) => {
-    uploadForm.photo = event.target.files[0];
+    uploadForm.photos = Array.from(event.target.files);
 };
 
 const deleteForm = useForm({});
@@ -66,11 +72,13 @@ const confirmDelete = (photoId) => {
 
 const deletePhoto = () => {
     if (!targetPhotoId.value) return;
+    startLoading('Menghapus foto...');
     deleteForm.delete(route('albums.photos.destroy', { albumToken: props.album.token, photo: targetPhotoId.value }), {
         preserveScroll: true,
         onFinish: () => {
             showConfirm.value = false;
             targetPhotoId.value = null;
+            stopLoading();
         },
     });
 };
@@ -94,8 +102,11 @@ const closeUploadModal = () => {
 };
 
 const submitEdit = () => {
+    startLoading('Menyimpan perubahan...');
     editForm.put(route('albums.update', { albumToken: props.album.token }), {
         preserveScroll: true,
+        onSuccess: () => stopLoading(),
+        onError: () => stopLoading(),
     });
 };
 </script>
@@ -297,7 +308,7 @@ const submitEdit = () => {
                         </div>
                         <div class="flex flex-col gap-2 rounded-2xl border border-dashed border-white/20 bg-slate-900/60 p-4 text-sm text-white/80">
                             <div class="flex items-center justify-between">
-                                <InputLabel for="photo-modal" value="File foto" />
+                                <InputLabel for="photo-modal" value="File foto (pilih beberapa)" />
                                 <span class="rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-white/70">max 5MB</span>
                             </div>
                             <input
@@ -305,13 +316,14 @@ const submitEdit = () => {
                                 ref="photoInput"
                                 type="file"
                                 accept="image/*"
+                                multiple
                                 class="w-full text-sm text-white file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-cyan-600"
                                 @change="handleFileChange"
                             />
-                            <InputError :message="uploadForm.errors.photo" class="mt-1" />
+                            <InputError :message="uploadForm.errors.photos" class="mt-1" />
                         </div>
                         <PrimaryButton :disabled="uploadForm.processing" class="w-full justify-center">
-                            Upload Foto
+                            Upload {{ uploadForm.photos.length > 0 ? uploadForm.photos.length + ' Foto' : 'Foto' }}
                         </PrimaryButton>
                     </form>
                 </div>

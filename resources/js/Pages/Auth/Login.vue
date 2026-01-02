@@ -6,6 +6,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { useLoading } from '@/composables/useLoading';
 
 defineProps({
     canResetPassword: Boolean,
@@ -18,9 +19,15 @@ const form = useForm({
     remember: false,
 });
 
+const { startLoading, stopLoading } = useLoading();
+
 const submit = () => {
+    startLoading('Masuk ke akun...');
     form.post(route('login'), {
-        onFinish: () => form.reset('password'),
+        onFinish: () => {
+            form.reset('password');
+            stopLoading();
+        },
     });
 };
 </script>
